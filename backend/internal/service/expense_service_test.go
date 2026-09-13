@@ -1,6 +1,7 @@
 package service
 
 import (
+	"math"
 	"testing"
 
 	"github.com/aasplit/aasplit/internal/constants"
@@ -152,6 +153,23 @@ func TestExpenseServiceShareSplitInvalidShare(t *testing.T) {
 	_, err := svc.Create(aliceID, req)
 	if err == nil {
 		t.Fatalf("expected invalid split error, got nil")
+	}
+	ae := util.AsAppError(err)
+	if ae.Code != constants.CodeExpenseInvalidSplit {
+		t.Fatalf("err code = %d, want %d", ae.Code, constants.CodeExpenseInvalidSplit)
+	}
+}
+
+func TestExpenseServiceShareSplitHugeShareRejected(t *testing.T) {
+	_, svc, _, groupID, aliceID, bobID, _ := newExpenseServiceFixture(t)
+	req := &dto.CreateExpenseReq{
+		GroupID: groupID, Title: "巨额份额", Amount: 100, Category: "other",
+		PayerID: aliceID, SplitType: "share", PaidAt: "2026-08-07 12:00:00",
+		Shares: []dto.ShareInput{{UserID: aliceID, Share: math.MaxInt64}, {UserID: bobID, Share: 1}},
+	}
+	_, err := svc.Create(aliceID, req)
+	if err == nil {
+		t.Fatalf("expected invalid split error for huge share, got nil")
 	}
 	ae := util.AsAppError(err)
 	if ae.Code != constants.CodeExpenseInvalidSplit {

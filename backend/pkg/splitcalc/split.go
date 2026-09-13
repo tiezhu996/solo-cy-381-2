@@ -3,6 +3,7 @@ package splitcalc
 
 import (
 	"errors"
+	"math"
 	"sort"
 )
 
@@ -112,23 +113,36 @@ func CalculateShares(total float64, splitType SplitType, participants []Particip
 
 // calculateByShare 按份额分摊：应付金额按份额占比计算，尾差（分）依次分给份额更高的
 // 参与人，份额相同时按参与人名单顺序分配，保证合计严格等于消费总额。
+// 计算以分为单位做 int64 整数运算；份额或总额过大导致 总额分×总份额 可能溢出
+// int64 时视为超出可靠范围，直接返回 ErrInvalidSplit 拒绝。
 func calculateByShare(total float64, participants []Participant) ([]Share, error) {
-	sumShare := 0
+	// 总额换算成分后必须落在 int64 可表示范围内。
+	centsF := total*100 + 0.5
+	if centsF >= math.MaxInt64 {
+		return nil, ErrInvalidSplit
+	}
+	totalCents := int64(centsF)
+	// 校验份额为正整数，且份额总和、总额分×总份额 均不溢出 int64。
+	sumShare := int64(0)
 	for _, p := range participants {
 		if p.Share <= 0 {
 			return nil, ErrInvalidSplit
 		}
-		sumShare += p.Share
+		if int64(p.Share) > math.MaxInt64-sumShare {
+			return nil, ErrInvalidSplit
+		}
+		sumShare += int64(p.Share)
 	}
-	// 以分为单位做整数运算，避免浮点误差。
-	totalCents := int64(total*100 + 0.5)
+	if totalCents > 0 && sumShare > math.MaxInt64/totalCents {
+		return nil, ErrInvalidSplit
+	}
 	cents := make([]int64, len(participants))
 	allocated := int64(0)
 	for i, p := range participants {
 		// 四舍五入：q = totalCents*share/sumShare，余数两倍不小于除数则进一。
 		prod := totalCents * int64(p.Share)
-		q := prod / int64(sumShare)
-		if r := prod % int64(sumShare); 2*r >= int64(sumShare) {
+		q := prod / sumShare
+		if r := prod % sumShare; r >= sumShare-r {
 			q++
 		}
 		cents[i] = q

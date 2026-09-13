@@ -1,6 +1,7 @@
 package splitcalc
 
 import (
+	"math"
 	"testing"
 )
 
@@ -149,6 +150,55 @@ func TestCalculateSharesByShareInvalid(t *testing.T) {
 	}
 	if _, err := CalculateShares(100, SplitShare, []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: -2}}); err != ErrInvalidSplit {
 		t.Fatalf("err = %v, want ErrInvalidSplit", err)
+	}
+}
+
+func TestCalculateSharesByShareOverflow(t *testing.T) {
+	tests := []struct {
+		name  string
+		total float64
+		parts []Participant
+	}{
+		{"single max int64 share", 100, []Participant{{UserID: 1, Share: math.MaxInt64}}},
+		{"share times cents overflows", 100, []Participant{{UserID: 1, Share: 1 << 60}, {UserID: 2, Share: 1}}},
+		{"share sum overflows", 0.01, []Participant{{UserID: 1, Share: math.MaxInt64}, {UserID: 2, Share: math.MaxInt64}}},
+		{"huge total cents overflows", 1e17, []Participant{{UserID: 1, Share: 1}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := CalculateShares(tt.total, SplitShare, tt.parts); err != ErrInvalidSplit {
+				t.Fatalf("err = %v, want ErrInvalidSplit（超出可靠范围应拒绝）", err)
+			}
+		})
+	}
+}
+
+func TestCalculateSharesByShareLargeButValid(t *testing.T) {
+	// 总额 0.01、单个极大份额：1 分 × MaxInt64 不溢出，允许且结果非负。
+	shares, err := CalculateShares(0.01, SplitShare, []Participant{{UserID: 1, Share: math.MaxInt64}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if shares[0].ShareAmount != 0.01 || shares[0].Ratio != 1 {
+		t.Fatalf("got %+v, want amount 0.01 ratio 1", shares[0])
+	}
+	// 大份额但可可靠计算：1e14 : 1，总额 100。
+	shares, err = CalculateShares(100, SplitShare, []Participant{{UserID: 1, Share: 100_000_000_000_000}, {UserID: 2, Share: 1}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	sum := 0.0
+	for _, s := range shares {
+		if s.ShareAmount < 0 || s.Ratio < 0 || s.Ratio > 1 {
+			t.Fatalf("negative or invalid result: %+v", s)
+		}
+		sum += s.ShareAmount
+	}
+	if shares[0].ShareAmount != 100 || shares[1].ShareAmount != 0 {
+		t.Fatalf("got %.2f / %.2f, want 100.00 / 0.00", shares[0].ShareAmount, shares[1].ShareAmount)
+	}
+	if round2(sum) != 100 {
+		t.Fatalf("sum = %.2f, want 100.00", sum)
 	}
 }
 
