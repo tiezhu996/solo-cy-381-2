@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS expense_shares (
     user_id      BIGINT NOT NULL,
     share_amount DOUBLE PRECISION NOT NULL,
     ratio        DOUBLE PRECISION NOT NULL DEFAULT 0,
+    share_count  INTEGER NOT NULL DEFAULT 0,
     status       VARCHAR(16) NOT NULL DEFAULT 'unsettled',
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),

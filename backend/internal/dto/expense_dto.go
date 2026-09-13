@@ -5,6 +5,7 @@ type ShareInput struct {
 	UserID uint    `json:"user_id" binding:"required,gt=0"`
 	Ratio  float64 `json:"ratio" binding:"omitempty,gte=0"`
 	Amount float64 `json:"amount" binding:"omitempty,gte=0"`
+	Share  int     `json:"share" binding:"omitempty,gte=0"` // share 模式下份额（正整数）
 }
 
 // CreateExpenseReq 创建消费记录请求（group_id 可省略，由路径参数补充）。
@@ -14,7 +15,7 @@ type CreateExpenseReq struct {
 	Amount     float64      `json:"amount" binding:"required,gt=0"`
 	Category   string       `json:"category" binding:"required,oneof=dining transport lodging entertain other"`
 	PayerID    uint         `json:"payer_id" binding:"required,gt=0"`
-	SplitType  string       `json:"split_type" binding:"required,oneof=equal ratio amount"`
+	SplitType  string       `json:"split_type" binding:"required,oneof=equal ratio amount share"`
 	PaidAt     string       `json:"paid_at" binding:"required"`
 	ReceiptURL string       `json:"receipt_url" binding:"omitempty,max=512"`
 	Shares     []ShareInput `json:"shares" binding:"required,min=1"`
@@ -26,7 +27,7 @@ type UpdateExpenseReq struct {
 	Amount     float64      `json:"amount" binding:"required,gt=0"`
 	Category   string       `json:"category" binding:"required,oneof=dining transport lodging entertain other"`
 	PayerID    uint         `json:"payer_id" binding:"required,gt=0"`
-	SplitType  string       `json:"split_type" binding:"required,oneof=equal ratio amount"`
+	SplitType  string       `json:"split_type" binding:"required,oneof=equal ratio amount share"`
 	PaidAt     string       `json:"paid_at" binding:"required"`
 	ReceiptURL string       `json:"receipt_url" binding:"omitempty,max=512"`
 	Shares     []ShareInput `json:"shares" binding:"required,min=1"`
@@ -48,6 +49,7 @@ type ExpenseShareResp struct {
 	Nickname    string  `json:"nickname"`
 	ShareAmount float64 `json:"share_amount"`
 	Ratio       float64 `json:"ratio"`
+	Share       int     `json:"share"` // 按份额分摊时参与人的份额，其他方式为 0
 	Status      string  `json:"status"`
 }
 

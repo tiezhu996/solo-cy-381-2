@@ -21,6 +21,7 @@ export const SplitType = {
   EQUAL: 'equal',
   RATIO: 'ratio',
   AMOUNT: 'amount',
+  SHARE: 'share',
 } as const
 
 export const ExpenseStatus = {
@@ -50,6 +51,7 @@ export const SplitTypeOptions = [
   { value: SplitType.EQUAL, label: '均摊' },
   { value: SplitType.RATIO, label: '按比例' },
   { value: SplitType.AMOUNT, label: '按金额' },
+  { value: SplitType.SHARE, label: '按份额' },
 ]
 
 export const SettlementStatusOptions = [

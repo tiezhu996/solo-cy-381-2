@@ -19,6 +19,7 @@ type ExpenseShare struct {
 	UserID      uint        `gorm:"index:idx_share_expense_user,unique;not null" json:"user_id"`
 	ShareAmount float64     `gorm:"type:double precision;not null" json:"share_amount"`
 	Ratio       float64     `gorm:"type:double precision;default:0" json:"ratio"`
+	ShareCount  int         `gorm:"default:0" json:"share_count"` // 按份额分摊时参与人填写的份额
 	Status      ShareStatus `gorm:"size:16;not null;default:unsettled" json:"status"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`

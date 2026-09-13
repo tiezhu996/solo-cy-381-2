@@ -115,6 +115,93 @@ func TestExpenseServiceCreateAmountMismatch(t *testing.T) {
 	}
 }
 
+func TestExpenseServiceCreateShareSplit(t *testing.T) {
+	_, svc, _, groupID, aliceID, bobID, carolID := newExpenseServiceFixture(t)
+	req := &dto.CreateExpenseReq{
+		GroupID: groupID, Title: "民宿", Amount: 100, Category: "lodging",
+		PayerID: aliceID, SplitType: "share", PaidAt: "2026-08-04 12:00:00",
+		Shares: []dto.ShareInput{{UserID: aliceID, Share: 1}, {UserID: bobID, Share: 1}, {UserID: carolID, Share: 1}},
+	}
+	expense, err := svc.Create(aliceID, req)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	want := map[uint]float64{aliceID: 33.34, bobID: 33.33, carolID: 33.33}
+	sum := 0.0
+	for _, s := range expense.Shares {
+		if s.ShareAmount != want[s.UserID] {
+			t.Fatalf("user %d amount = %.2f, want %.2f", s.UserID, s.ShareAmount, want[s.UserID])
+		}
+		if s.ShareCount != 1 {
+			t.Fatalf("user %d share count = %d, want 1", s.UserID, s.ShareCount)
+		}
+		sum += s.ShareAmount
+	}
+	if util.Round2(sum) != 100 {
+		t.Fatalf("share sum = %.2f, want 100.00", sum)
+	}
+}
+
+func TestExpenseServiceShareSplitInvalidShare(t *testing.T) {
+	_, svc, _, groupID, aliceID, bobID, _ := newExpenseServiceFixture(t)
+	req := &dto.CreateExpenseReq{
+		GroupID: groupID, Title: "烧烤", Amount: 80, Category: "dining",
+		PayerID: aliceID, SplitType: "share", PaidAt: "2026-08-05 12:00:00",
+		Shares: []dto.ShareInput{{UserID: aliceID, Share: 1}, {UserID: bobID, Share: 0}},
+	}
+	_, err := svc.Create(aliceID, req)
+	if err == nil {
+		t.Fatalf("expected invalid split error, got nil")
+	}
+	ae := util.AsAppError(err)
+	if ae.Code != constants.CodeExpenseInvalidSplit {
+		t.Fatalf("err code = %d, want %d", ae.Code, constants.CodeExpenseInvalidSplit)
+	}
+}
+
+func TestExpenseServiceUpdateToShareSplit(t *testing.T) {
+	_, svc, _, groupID, aliceID, bobID, carolID := newExpenseServiceFixture(t)
+	createReq := &dto.CreateExpenseReq{
+		GroupID: groupID, Title: "门票", Amount: 90, Category: "entertain",
+		PayerID: aliceID, SplitType: "equal", PaidAt: "2026-08-06 12:00:00",
+		Shares: []dto.ShareInput{{UserID: aliceID}, {UserID: bobID}, {UserID: carolID}},
+	}
+	expense, err := svc.Create(aliceID, createReq)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	updateReq := &dto.UpdateExpenseReq{
+		Title: "门票", Amount: 90, Category: "entertain",
+		PayerID: aliceID, SplitType: "share", PaidAt: "2026-08-06 12:00:00",
+		Shares: []dto.ShareInput{{UserID: aliceID, Share: 2}, {UserID: bobID, Share: 1}, {UserID: carolID, Share: 1}},
+	}
+	if err := svc.Update(aliceID, expense.ID, updateReq); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got, err := svc.Get(aliceID, expense.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.SplitType != constants.SplitShare {
+		t.Fatalf("split type = %s, want share", got.SplitType)
+	}
+	want := map[uint]float64{aliceID: 45, bobID: 22.5, carolID: 22.5}
+	wantShare := map[uint]int{aliceID: 2, bobID: 1, carolID: 1}
+	sum := 0.0
+	for _, s := range got.Shares {
+		if s.ShareAmount != want[s.UserID] {
+			t.Fatalf("user %d amount = %.2f, want %.2f", s.UserID, s.ShareAmount, want[s.UserID])
+		}
+		if s.ShareCount != wantShare[s.UserID] {
+			t.Fatalf("user %d share count = %d, want %d", s.UserID, s.ShareCount, wantShare[s.UserID])
+		}
+		sum += s.ShareAmount
+	}
+	if util.Round2(sum) != 90 {
+		t.Fatalf("share sum = %.2f, want 90.00", sum)
+	}
+}
+
 func TestExpenseServiceDeleteAndStatus(t *testing.T) {
 	_, svc, _, groupID, aliceID, bobID, _ := newExpenseServiceFixture(t)
 	req := &dto.CreateExpenseReq{

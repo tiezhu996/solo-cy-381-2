@@ -143,6 +143,7 @@ func toExpenseResp(e *model.Expense) *dto.ExpenseResp {
 			Nickname:    nickname,
 			ShareAmount: util.Round2(s.ShareAmount),
 			Ratio:       util.Round2(s.Ratio),
+			Share:       s.ShareCount,
 			Status:      string(s.Status),
 		})
 	}

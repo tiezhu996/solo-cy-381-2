@@ -20,6 +20,17 @@
         <el-button @click="handleExport">导出 CSV</el-button>
       </div>
       <DataTable :data="expenseStore.expenses" :loading="expenseStore.loading" :total="expenseStore.total" show-pagination @page-change="handlePage">
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div class="share-expand">
+              <div v-for="s in row.shares" :key="s.user_id" class="share-expand__row">
+                <span class="share-expand__name">{{ s.nickname || s.username }}</span>
+                <span v-if="row.split_type === 'share'" class="share-expand__share">份额 {{ s.share }}</span>
+                <span>应付 <MoneyText :value="s.share_amount" /></span>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="title" label="标题" min-width="130" show-overflow-tooltip />
         <el-table-column label="金额" width="110">
           <template #default="{ row }"><MoneyText :value="row.amount" /></template>
@@ -62,6 +73,7 @@
         <h4 style="margin: 16px 0 8px">分摊明细</h4>
         <el-table :data="currentExpense.shares" size="small" border>
           <el-table-column prop="nickname" label="成员" />
+          <el-table-column v-if="currentExpense.split_type === 'share'" prop="share" label="份额" width="80" />
           <el-table-column label="应付金额">
             <template #default="{ row }"><MoneyText :value="row.share_amount" /></template>
           </el-table-column>
@@ -194,5 +206,23 @@ function handleExport() {
   gap: 12px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+.share-expand {
+  padding: 8px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.share-expand__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+}
+.share-expand__name {
+  width: 120px;
+}
+.share-expand__share {
+  color: var(--el-text-color-secondary);
 }
 </style>

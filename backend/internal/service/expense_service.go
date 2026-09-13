@@ -81,6 +81,7 @@ func (s *ExpenseService) Create(userID uint, req *dto.CreateExpenseReq) (*model.
 				UserID:      sh.UserID,
 				ShareAmount: sh.ShareAmount,
 				Ratio:       sh.Ratio,
+				ShareCount:  sh.ShareCount,
 				Status:      model.ShareUnsettled,
 			})
 		}
@@ -149,6 +150,7 @@ func (s *ExpenseService) Update(userID, expenseID uint, req *dto.UpdateExpenseRe
 				UserID:      sh.UserID,
 				ShareAmount: sh.ShareAmount,
 				Ratio:       sh.Ratio,
+				ShareCount:  sh.ShareCount,
 				Status:      model.ShareUnsettled,
 			})
 		}
@@ -303,7 +305,7 @@ func (s *ExpenseService) calcShares(tx *gorm.DB, groupID uint, amount float64, s
 		if _, ok := memberSet[in.UserID]; !ok {
 			return nil, util.NewAppError(constants.CodeBadRequest, fmt.Sprintf("参与人 user_id=%d 不是群组成员 member", in.UserID), nil)
 		}
-		participants = append(participants, splitcalc.Participant{UserID: in.UserID, Ratio: in.Ratio, Amount: in.Amount})
+		participants = append(participants, splitcalc.Participant{UserID: in.UserID, Ratio: in.Ratio, Amount: in.Amount, Share: in.Share})
 	}
 	shares, err := splitcalc.CalculateShares(amount, splitcalc.SplitType(splitType), participants)
 	if errors.Is(err, splitcalc.ErrSumMismatch) {

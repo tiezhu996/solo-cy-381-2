@@ -48,6 +48,17 @@
               size="small"
               style="width: 140px"
             />
+            <el-input-number
+              v-else-if="form.split_type === 'share'"
+              v-model="share.share"
+              :min="1"
+              :precision="0"
+              :step="1"
+              step-strictly
+              size="small"
+              style="width: 140px"
+              placeholder="份额"
+            />
             <el-button v-if="share.user_id !== form.payer_id" size="small" text type="danger" @click="removeShare(index)">
               移除
             </el-button>
@@ -78,6 +89,7 @@ interface ShareForm {
   nickname: string
   ratio: number
   amount: number
+  share: number
 }
 
 const props = defineProps<{ members: MemberInfo[]; expense?: ExpenseInfo | null }>()
@@ -121,11 +133,11 @@ const rules: FormRules = {
 function buildShares() {
   form.shares = props.members
     .filter((m) => m.user_id !== form.payer_id)
-    .map((m) => ({ user_id: m.user_id, nickname: m.nickname || m.username, ratio: 1, amount: 0 }))
+    .map((m) => ({ user_id: m.user_id, nickname: m.nickname || m.username, ratio: 1, amount: 0, share: 1 }))
   // 付款人默认也参与
   const payer = props.members.find((m) => m.user_id === form.payer_id)
   if (payer && !form.shares.some((s) => s.user_id === payer.user_id)) {
-    form.shares.unshift({ user_id: payer.user_id, nickname: payer.nickname || payer.username, ratio: 1, amount: 0 })
+    form.shares.unshift({ user_id: payer.user_id, nickname: payer.nickname || payer.username, ratio: 1, amount: 0, share: 1 })
   }
 }
 
@@ -146,6 +158,7 @@ function open(expense?: ExpenseInfo | null) {
       nickname: s.nickname || s.username,
       ratio: s.ratio || 1,
       amount: s.share_amount || 0,
+      share: s.share || 1,
     }))
   } else {
     buildShares()
@@ -165,6 +178,10 @@ async function handleSubmit() {
     ElMessage.warning('请至少选择一位参与人')
     return
   }
+  if (form.split_type === SplitType.SHARE && form.shares.some((s) => !Number.isInteger(s.share) || s.share < 1)) {
+    ElMessage.warning('按份额分摊时，每位参与人的份额需为正整数')
+    return
+  }
   const payload: ExpensePayload = {
     title: form.title,
     amount: form.amount,
@@ -177,6 +194,7 @@ async function handleSubmit() {
       user_id: s.user_id,
       ratio: form.split_type === SplitType.RATIO ? s.ratio : undefined,
       amount: form.split_type === SplitType.AMOUNT ? s.amount : undefined,
+      share: form.split_type === SplitType.SHARE ? s.share : undefined,
     })),
   }
   submitting.value = true

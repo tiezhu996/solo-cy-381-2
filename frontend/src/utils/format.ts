@@ -39,6 +39,7 @@ export function splitTypeText(value: string): string {
     [SplitType.EQUAL]: '均摊',
     [SplitType.RATIO]: '按比例',
     [SplitType.AMOUNT]: '按金额',
+    [SplitType.SHARE]: '按份额',
   }
   return map[value] || value
 }

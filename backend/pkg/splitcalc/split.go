@@ -13,6 +13,7 @@ const (
 	SplitEqual  SplitType = "equal"  // 均摊
 	SplitRatio  SplitType = "ratio"  // 按比例
 	SplitAmount SplitType = "amount" // 按金额
+	SplitShare  SplitType = "share"  // 按份额
 )
 
 // Participant 分摊参与人。
@@ -20,6 +21,7 @@ type Participant struct {
 	UserID uint    `json:"user_id"`
 	Ratio  float64 `json:"ratio,omitempty"`  // ratio 模式下占比
 	Amount float64 `json:"amount,omitempty"` // amount 模式下应付金额
+	Share  int     `json:"share,omitempty"`  // share 模式下份额（正整数）
 }
 
 // Share 单人的分摊结果。
@@ -27,6 +29,7 @@ type Share struct {
 	UserID      uint    `json:"user_id"`
 	ShareAmount float64 `json:"share_amount"`
 	Ratio       float64 `json:"ratio"`
+	ShareCount  int     `json:"share_count"` // share 模式下参与人填写的份额
 }
 
 // ErrInvalidSplit 分摊参数无效。
@@ -99,8 +102,77 @@ func CalculateShares(total float64, splitType SplitType, participants []Particip
 			}
 			shares = append(shares, Share{UserID: p.UserID, ShareAmount: round2(p.Amount), Ratio: ratio})
 		}
+	case SplitShare:
+		return calculateByShare(total, participants)
 	default:
 		return nil, ErrInvalidSplit
+	}
+	return shares, nil
+}
+
+// calculateByShare 按份额分摊：应付金额按份额占比计算，尾差（分）依次分给份额更高的
+// 参与人，份额相同时按参与人名单顺序分配，保证合计严格等于消费总额。
+func calculateByShare(total float64, participants []Participant) ([]Share, error) {
+	sumShare := 0
+	for _, p := range participants {
+		if p.Share <= 0 {
+			return nil, ErrInvalidSplit
+		}
+		sumShare += p.Share
+	}
+	// 以分为单位做整数运算，避免浮点误差。
+	totalCents := int64(total*100 + 0.5)
+	cents := make([]int64, len(participants))
+	allocated := int64(0)
+	for i, p := range participants {
+		// 四舍五入：q = totalCents*share/sumShare，余数两倍不小于除数则进一。
+		prod := totalCents * int64(p.Share)
+		q := prod / int64(sumShare)
+		if r := prod % int64(sumShare); 2*r >= int64(sumShare) {
+			q++
+		}
+		cents[i] = q
+		allocated += q
+	}
+	// 分配顺序：份额降序，份额相同保持名单先后顺序。
+	order := make([]int, len(participants))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(i, j int) bool { return participants[order[i]].Share > participants[order[j]].Share })
+	remainder := totalCents - allocated
+	for remainder > 0 {
+		for _, idx := range order {
+			if remainder <= 0 {
+				break
+			}
+			cents[idx]++
+			remainder--
+		}
+	}
+	for remainder < 0 {
+		// 尾差为负时从份额低者开始扣减（不扣成负数）。
+		progressed := false
+		for k := len(order) - 1; k >= 0 && remainder < 0; k-- {
+			idx := order[k]
+			if cents[idx] > 0 {
+				cents[idx]--
+				remainder++
+				progressed = true
+			}
+		}
+		if !progressed {
+			break
+		}
+	}
+	shares := make([]Share, 0, len(participants))
+	for i, p := range participants {
+		shares = append(shares, Share{
+			UserID:      p.UserID,
+			ShareAmount: float64(cents[i]) / 100,
+			Ratio:       round2(float64(p.Share) / float64(sumShare)),
+			ShareCount:  p.Share,
+		})
 	}
 	return shares, nil
 }

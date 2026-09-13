@@ -56,6 +56,8 @@ func SplitTypeText(s string) string {
 		return "按比例"
 	case constants.SplitAmount:
 		return "按金额"
+	case constants.SplitShare:
+		return "按份额"
 	default:
 		return "未知"
 	}

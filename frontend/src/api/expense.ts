@@ -6,6 +6,7 @@ export interface ShareInput {
   user_id: number
   ratio?: number
   amount?: number
+  share?: number
 }
 
 export interface ExpenseShare {
@@ -14,6 +15,7 @@ export interface ExpenseShare {
   nickname: string
   share_amount: number
   ratio: number
+  share: number
   status: string
 }
 

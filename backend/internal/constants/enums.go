@@ -35,6 +35,7 @@ const (
 	SplitEqual  SplitType = "equal"  // 均摊
 	SplitRatio  SplitType = "ratio"  // 按比例
 	SplitAmount SplitType = "amount" // 按金额
+	SplitShare  SplitType = "share"  // 按份额
 )
 
 // ExpenseStatus 消费记录状态枚举
@@ -97,7 +98,7 @@ func IsValidExpenseCategory(c string) bool {
 // IsValidSplitType 校验分摊方式
 func IsValidSplitType(s string) bool {
 	switch SplitType(s) {
-	case SplitEqual, SplitRatio, SplitAmount:
+	case SplitEqual, SplitRatio, SplitAmount, SplitShare:
 		return true
 	}
 	return false

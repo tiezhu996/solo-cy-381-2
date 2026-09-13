@@ -24,7 +24,7 @@ docker compose up -d --build
 
 1. **创建分账群组**：创建群组、邀请好友、群组名称与描述编辑、归档。
 2. **添加消费记录**：金额、类别（餐饮/交通/住宿/娱乐/其他）、付款人、参与人、分摊方式、小票图片 URL。
-3. **多种分摊方式**：均摊 / 按比例 / 按金额，系统自动计算每人应付金额（合计严格等于消费总额）。
+3. **多种分摊方式**：均摊 / 按比例 / 按金额 / 按份额，系统自动计算每人应付金额（合计严格等于消费总额；按份额时尾差依次分给份额更高的参与人，份额相同按名单顺序）。
 4. **智能结算建议**：基于成员净余额贪心匹配最大债权人与债务人，最小化转账次数生成结算清单。
 5. **账单历史查询**：按群组、时间范围、消费类别筛选，支持导出账单明细 CSV。
 6. **用户中心**：注册登录、头像昵称邮箱管理、我的群组列表、待结算提醒。
@@ -156,6 +156,11 @@ curl -sS -X POST http://localhost:19401/api/v1/groups/1/expenses \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"title":"火锅","amount":300,"category":"dining","payer_id":1,"split_type":"equal","paid_at":"2026-08-01 12:00:00","shares":[{"user_id":1},{"user_id":2},{"user_id":3}]}'
 
+# 5b. 添加消费记录（按份额：每人填正整数份额，尾差分给份额更高者）
+curl -sS -X POST http://localhost:19401/api/v1/groups/1/expenses \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"title":"民宿","amount":100,"category":"lodging","payer_id":1,"split_type":"share","paid_at":"2026-08-02 12:00:00","shares":[{"user_id":1,"share":2},{"user_id":2,"share":1},{"user_id":3,"share":1}]}'
+
 # 6. 生成智能结算建议
 curl -sS -X POST http://localhost:19401/api/v1/groups/1/settlements/generate \
   -H "Authorization: Bearer $TOKEN"
@@ -254,23 +259,24 @@ curl -sS http://localhost:19401/api/v1/audit-logs \
 - `src/pages/stats/GroupStats.vue`：类别占比图
 - `src/utils/format.ts`：`categoryText`
 
-### 3. 分摊方式 SplitType（equal / ratio / amount）
+### 3. 分摊方式 SplitType（equal / ratio / amount / share）
 
 后端出现位置：
 - `internal/constants/enums.go`：定义枚举与 `IsValidSplitType`
 - `internal/model/expense.go`：`Expense.SplitType` 字段
-- `internal/dto/expense_dto.go`：`oneof=equal ratio amount` 校验
+- `internal/model/expense_share.go`：`ExpenseShare.ShareCount` 持久化按份额分摊的份额
+- `internal/dto/expense_dto.go`：`oneof=equal ratio amount share` 校验、`ShareInput.Share` 与 `ExpenseShareResp.Share`
 - `internal/service/expense_service.go`：`calcShares` 调用 splitcalc
 - `internal/service/expense_service.go`：日志 `LogExpenseCreated/LogExpenseUpdated`
-- `pkg/splitcalc/split.go`：三种分摊算法
+- `pkg/splitcalc/split.go`：四种分摊算法（按份额：尾差依次分给份额更高者，同份额按名单顺序）
 - `internal/util/formatters.go`：`SplitTypeText`
 - `internal/constants/error_codes.go`：`CodeExpenseInvalidSplit` / `CodeExpenseShareMismatch`
 
 前端出现位置：
 - `src/constants/index.ts`：`SplitType` 与 `SplitTypeOptions`
 - `src/components/SplitTypeTag.vue`、`StatusBadge.vue`
-- `src/components/ExpenseFormDialog.vue`：分摊方式单选与参与人输入联动
-- `src/pages/expense/ExpenseList.vue`：分摊方式标签
+- `src/components/ExpenseFormDialog.vue`：分摊方式单选与参与人输入联动（按份额时输入正整数份额）
+- `src/pages/expense/ExpenseList.vue`：分摊方式标签、列表展开行与详情分摊明细展示每人份额与应付金额
 - `src/utils/format.ts`：`splitTypeText`
 
 ### 4. 结算状态 SettlementStatus（pending / settled）

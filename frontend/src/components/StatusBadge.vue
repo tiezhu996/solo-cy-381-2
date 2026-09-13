@@ -29,7 +29,7 @@ const tagType = computed<'primary' | 'success' | 'warning' | 'info' | 'danger'>(
     case 'expense':
       return s === ExpenseStatus.ACTIVE ? 'success' : 'danger'
     case 'split':
-      return s === SplitType.EQUAL ? 'primary' : s === SplitType.RATIO ? 'warning' : 'success'
+      return s === SplitType.EQUAL ? 'primary' : s === SplitType.RATIO ? 'warning' : s === SplitType.SHARE ? 'info' : 'success'
     default:
       return 'info'
   }

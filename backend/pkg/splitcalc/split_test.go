@@ -64,6 +64,94 @@ func TestCalculateSharesAmountMismatch(t *testing.T) {
 	}
 }
 
+func TestCalculateSharesByShare(t *testing.T) {
+	tests := []struct {
+		name  string
+		total float64
+		parts []Participant
+		want  []float64 // 按名单顺序的应付金额
+	}{
+		{
+			name:  "proportional 1-2-1",
+			total: 100,
+			parts: []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: 2}, {UserID: 3, Share: 1}},
+			want:  []float64{25, 50, 25},
+		},
+		{
+			name:  "equal shares remainder to first in list",
+			total: 100,
+			parts: []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: 1}, {UserID: 3, Share: 1}},
+			want:  []float64{33.34, 33.33, 33.33},
+		},
+		{
+			name:  "remainder to higher share not list head",
+			total: 7.11,
+			parts: []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: 2}, {UserID: 3, Share: 2}},
+			want:  []float64{1.42, 2.85, 2.84},
+		},
+		{
+			name:  "tied higher shares remainder by list order",
+			total: 7.11,
+			parts: []Participant{{UserID: 1, Share: 2}, {UserID: 2, Share: 2}, {UserID: 3, Share: 1}},
+			want:  []float64{2.85, 2.84, 1.42},
+		},
+		{
+			name:  "negative remainder absorbed by last equal share",
+			total: 33.33,
+			parts: []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: 1}},
+			want:  []float64{16.67, 16.66},
+		},
+		{
+			name:  "tiny amount negative remainder",
+			total: 0.02,
+			parts: []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: 1}, {UserID: 3, Share: 1}},
+			want:  []float64{0.01, 0.01, 0},
+		},
+		{
+			name:  "odd cents 100.01 three way",
+			total: 100.01,
+			parts: []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: 1}, {UserID: 3, Share: 1}},
+			want:  []float64{33.34, 33.34, 33.33},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			shares, err := CalculateShares(tt.total, SplitShare, tt.parts)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(shares) != len(tt.want) {
+				t.Fatalf("got %d shares, want %d", len(shares), len(tt.want))
+			}
+			sum := 0.0
+			for i, s := range shares {
+				if s.UserID != tt.parts[i].UserID {
+					t.Fatalf("shares[%d].UserID = %d, want %d（结果应保持名单顺序）", i, s.UserID, tt.parts[i].UserID)
+				}
+				if s.ShareAmount != tt.want[i] {
+					t.Fatalf("user %d amount = %.2f, want %.2f", s.UserID, s.ShareAmount, tt.want[i])
+				}
+				if s.ShareCount != tt.parts[i].Share {
+					t.Fatalf("user %d share count = %d, want %d", s.UserID, s.ShareCount, tt.parts[i].Share)
+				}
+				sum += s.ShareAmount
+			}
+			if round2(sum) != round2(tt.total) {
+				t.Fatalf("sum = %.2f, want %.2f（合计必须等于消费总额）", sum, tt.total)
+			}
+		})
+	}
+}
+
+func TestCalculateSharesByShareInvalid(t *testing.T) {
+	if _, err := CalculateShares(100, SplitShare, []Participant{{UserID: 1, Share: 0}}); err != ErrInvalidSplit {
+		t.Fatalf("err = %v, want ErrInvalidSplit", err)
+	}
+	if _, err := CalculateShares(100, SplitShare, []Participant{{UserID: 1, Share: 1}, {UserID: 2, Share: -2}}); err != ErrInvalidSplit {
+		t.Fatalf("err = %v, want ErrInvalidSplit", err)
+	}
+}
+
 func TestCalculateSharesInvalid(t *testing.T) {
 	if _, err := CalculateShares(0, SplitEqual, []Participant{{UserID: 1}}); err != ErrInvalidSplit {
 		t.Fatalf("err = %v, want ErrInvalidSplit", err)
