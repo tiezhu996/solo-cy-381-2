@@ -220,6 +220,49 @@ func TestExpenseServiceUpdateToShareSplit(t *testing.T) {
 	}
 }
 
+// TestExpenseServiceUpdateFromShareToEqual 编辑切换：按份额 → 均摊后按新方式重算，
+// 份额数据不残留（ShareCount 归零），合计仍等于消费总额。
+func TestExpenseServiceUpdateFromShareToEqual(t *testing.T) {
+	_, svc, _, groupID, aliceID, bobID, carolID := newExpenseServiceFixture(t)
+	createReq := &dto.CreateExpenseReq{
+		GroupID: groupID, Title: "车费", Amount: 90, Category: "transport",
+		PayerID: aliceID, SplitType: "share", PaidAt: "2026-08-08 12:00:00",
+		Shares: []dto.ShareInput{{UserID: aliceID, Share: 2}, {UserID: bobID, Share: 1}, {UserID: carolID, Share: 1}},
+	}
+	expense, err := svc.Create(aliceID, createReq)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	updateReq := &dto.UpdateExpenseReq{
+		Title: "车费", Amount: 90, Category: "transport",
+		PayerID: aliceID, SplitType: "equal", PaidAt: "2026-08-08 12:00:00",
+		Shares: []dto.ShareInput{{UserID: aliceID}, {UserID: bobID}, {UserID: carolID}},
+	}
+	if err := svc.Update(aliceID, expense.ID, updateReq); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got, err := svc.Get(aliceID, expense.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.SplitType != constants.SplitEqual {
+		t.Fatalf("违反业务规则[编辑后按新分摊方式生效]: split_type = %s, want equal", got.SplitType)
+	}
+	sum := 0.0
+	for _, s := range got.Shares {
+		if s.ShareAmount != 30 {
+			t.Errorf("违反业务规则[切换为均摊后按均摊重算]: user %d 应付 %.2f, want 30.00", s.UserID, s.ShareAmount)
+		}
+		if s.ShareCount != 0 {
+			t.Errorf("违反业务规则[切换分摊方式后份额不残留]: user %d share_count = %d, want 0", s.UserID, s.ShareCount)
+		}
+		sum += s.ShareAmount
+	}
+	if util.Round2(sum) != 90 {
+		t.Fatalf("违反业务规则[所有人应付金额合计必须等于消费总额]: 合计 %.2f, want 90.00", sum)
+	}
+}
+
 func TestExpenseServiceDeleteAndStatus(t *testing.T) {
 	_, svc, _, groupID, aliceID, bobID, _ := newExpenseServiceFixture(t)
 	req := &dto.CreateExpenseReq{

@@ -315,11 +315,21 @@ curl -sS http://localhost:19401/api/v1/audit-logs \
 ## 测试
 
 ```bash
+# 后端
 cd backend
 go test ./...
+
+# 前端（vitest + jsdom）
+cd frontend
+npm install
+npm run test
 ```
 
-覆盖：分摊算法（`pkg/splitcalc/split_test.go`，表驱动）、用户仓储 CRUD、群组仓储、消费仓储（表驱动）、用户服务注册/登录（表驱动）、消费服务分摊/退款、结算服务生成与结算。
+后端覆盖：分摊算法（`pkg/splitcalc/split_test.go` 均摊/比例/金额，`pkg/splitcalc/split_share_test.go` 按份额规则化套件：正常份额、尾差分配、非正份额拒绝、极大份额溢出拒绝、可靠范围边界）、用户仓储 CRUD、群组仓储、消费仓储（表驱动）、用户服务注册/登录（表驱动）、消费服务分摊/退款/按份额创建与编辑切换、结算服务生成与结算（含按份额净余额与转账结果）。
+
+前端覆盖：`SplitTypeTag` 四种分摊方式（均摊/按比例/按金额/按份额）标签文案；`ExpenseList` 列表「分摊方式」列四种文案、按份额消费详情的标签/份额/应付金额、列表展开行份额与应付金额。
+
+断言消息直接标注业务规则编号（如 `违反业务规则[R3 尾差依次分给份额更高者，同份额按名单顺序]`），失败时可立即定位被破坏的规则；测试无随机与时间依赖，可连续重复运行。
 
 ## License
 
