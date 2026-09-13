@@ -4,5 +4,7 @@
 </template>
 
 <script setup lang="ts">
+import StatusBadge from './StatusBadge.vue'
+
 defineProps<{ type: string }>()
 </script>
